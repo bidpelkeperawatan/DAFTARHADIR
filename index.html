@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar Hadir Rapat</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Signature Pad v4.0.0 (versi ES Module) -->
+    <script type="module">
+        import SignaturePad from 'https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.m.js';
+        
+        // --- KONFIGURASI PENTING ---
+        // GANTI DENGAN URL WEB APP GOOGLE APPS SCRIPT ANDA SETELAH DEPLOY
+        const GAS_WEB_APP_URL = 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
+        // -------------------------
+
+        // Inisialisasi setelah DOM siap
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('signature-canvas');
+            const form = document.getElementById('hadir-form');
+            const clearButton = document.getElementById('clear-btn');
+            const submitButton = document.getElementById('submit-btn');
+            const messageDiv = document.getElementById('message');
+
+            // Set ukuran canvas agar responsif
+            function resizeCanvas() {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio;
+                canvas.height = canvas.offsetHeight * ratio;
+                canvas.getContext("2d").scale(ratio, ratio);
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            // Inisialisasi SignaturePad
+            const signaturePad = new SignaturePad(canvas, {
+                backgroundColor: 'rgb(255, 255, 255)'
+            });
+
+            // Fungsi untuk membersihkan tanda tangan
+            clearButton.addEventListener('click', () => {
+                signaturePad.clear();
+            });
+
+            // Fungsi untuk submit formulir
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault(); // Mencegah form submit default
+
+                // Cek apakah sudah tanda tangan
+                if (signaturePad.isEmpty()) {
+                    showMessage('Silakan bubuhkan tanda tangan Anda.', 'red');
+                    return;
+                }
+
+                // Tampilkan status loading
+                submitButton.disabled = true;
+                submitButton.textContent = 'Mengirim...';
+                messageDiv.innerHTML = '';
+
+                // Ambil data dari form
+                const nama = document.getElementById('nama').value;
+                const ruangan = document.getElementById('ruangan').value;
+                // Ambil data tanda tangan sebagai Base64 PNG
+                const signatureData = signaturePad.toDataURL('image/png');
+
+                try {
+                    // Kirim data ke Google Apps Script
+                    const response = await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        mode: 'cors', // Mode CORS diperlukan
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            nama: nama,
+                            ruangan: ruangan,
+                            signatureData: signatureData 
+                        }),
+                    });
+
+                    const result = await response.json();
+
+                    if (result.status === 'success') {
+                        showMessage('Terima kasih! Kehadiran Anda telah dicatat.', 'green');
+                        // Bersihkan form
+                        form.reset();
+                        signaturePad.clear();
+                    } else {
+                        throw new Error(result.message || 'Terjadi kesalahan');
+                    }
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    showMessage(`Gagal mengirim: ${error.message}`, 'red');
+                } finally {
+                    // Kembalikan tombol submit ke normal
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Simpan Kehadiran';
+                }
+            });
+
+            // Fungsi untuk menampilkan pesan
+            function showMessage(msg, color) {
+                const colorClasses = color === 'red' 
+                    ? 'bg-red-100 border-red-400 text-red-700' 
+                    : 'bg-green-100 border-green-400 text-green-700';
+                messageDiv.className = `border ${colorClasses} px-4 py-3 rounded-lg relative`;
+                messageDiv.textContent = msg;
+            }
+        });
+    </script>
+    <style>
+        /* Style tambahan untuk canvas */
+        canvas {
+            touch-action: none; /* Mencegah scrolling saat menggambar di mobile */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans antialiased">
+    <div class="container mx-auto max-w-lg p-6 my-10">
+        <div class="bg-white p-8 rounded-xl shadow-lg">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">
+                Daftar Hadir
+            </h1>
+
+            <!-- Form input -->
+            <form id="hadir-form" class="space-y-6">
+                <!-- Input Nama -->
+                <div>
+                    <label for="nama" class="block text-sm font-medium text-gray-700 mb-1">
+                        Nama Lengkap
+                    </label>
+                    <input type="text" id="nama" name="nama" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+
+                <!-- Input Ruangan -->
+                <div>
+                    <label for="ruangan" class="block text-sm font-medium text-gray-700 mb-1">
+                        Asal/Ruangan
+                    </label>
+                    <input type="text" id="ruangan" name="ruangan" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+
+                <!-- Canvas Tanda Tangan -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Tanda Tangan
+                    </label>
+                    <div class="border border-gray-300 rounded-lg shadow-sm bg-white">
+                        <canvas id="signature-canvas" class="w-full h-48"></canvas>
+                    </div>
+                    <button type="button" id="clear-btn" 
+                            class="text-sm text-blue-600 hover:text-blue-800 mt-2">
+                        Bersihkan Tanda Tangan
+                    </button>
+                </div>
+
+                <!-- Tombol Submit -->
+                <div class="pt-2">
+                    <button type="submit" id="submit-btn"
+                            class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300 ease-in-out">
+                        Simpan Kehadiran
+                    </button>
+                </div>
+            </form>
+
+            <!-- Div untuk pesan status -->
+            <div id="message" class="mt-6"></div>
+        </div>
+    </div>
+</body>
+</html>
