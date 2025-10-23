@@ -88,19 +88,17 @@
         import SignaturePad from 'https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.m.js';
         
         // --- KONFIGURASI PENTING ---
-        // URL Web App Google Apps Script BARU Anda
-        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwKf8hpbxcdgh4IccXc4ugyZbXDC3XKGdMefKW8a6vs7-DwK0Iv2QFZPEfMvdh_1Tst/exec';
-        // -------------------------
-
-        // Ambil elemen dari DOM
-        const canvas = document.getElementById('signature-canvas');
-        const form = document.getElementById('hadir-form');
+// ... existing code ... -->
         const clearButton = document.getElementById('clear-btn');
         const submitButton = document.getElementById('submit-btn');
         const messageDiv = document.getElementById('message');
 
-        // Fungsi untuk menyesuaikan ukuran canvas agar responsif
-        function resizeCanvas() {
+        // --- PERBAIKAN UNTUK MASALAH KANVAS ---
+        // Deklarasikan signaturePad di sini agar bisa diakses di fungsi resize
+        let signaturePad;
+
+        // Fungsi resize ASINKRON (untuk event listener)
+        function resizeCanvasAsync() {
             // Beri sedikit jeda agar layout stabil
             setTimeout(() => {
                 if (canvas) {
@@ -108,22 +106,37 @@
                     canvas.width = canvas.offsetWidth * ratio;
                     canvas.height = canvas.offsetHeight * ratio;
                     canvas.getContext("2d").scale(ratio, ratio);
-                    // Setelah resize, data gambar hilang, jadi kita perlu clear (opsional, tapi baik)
-                    // signaturePad.clear(); 
+                    
+                    // Jika signaturePad sudah ada, kita perlu clear
+                    // karena mengubah ukuran kanvas akan menghapus gambar
+                    if (signaturePad) {
+                        signaturePad.clear(); 
+                    }
                 }
             }, 100); 
         }
 
-        // Panggil resize saat jendela diubah ukurannya
-        window.addEventListener('resize', resizeCanvas);
-        // Panggil sekali di awal
-        resizeCanvas();
+        // Fungsi resize SINKRON (untuk inisialisasi awal)
+        function resizeCanvasSync() {
+            if (!canvas) return;
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            canvas.width = canvas.offsetWidth * ratio;
+            canvas.height = canvas.offsetHeight * ratio;
+            canvas.getContext("2d").scale(ratio, ratio);
+        }
+
+        // Panggil resize ASINKRON saat jendela diubah ukurannya
+        window.addEventListener('resize', resizeCanvasAsync);
+        
+        // Panggil resize SINKRON sekali di awal SEBELUM inisialisasi
+        resizeCanvasSync();
 
         // Inisialisasi SignaturePad
-        // Ini sekarang aman karena skrip ada di akhir body
-        const signaturePad = new SignaturePad(canvas, {
+        // Ini sekarang aman karena canvas SUDAH di-resize
+        signaturePad = new SignaturePad(canvas, {
             backgroundColor: 'rgb(249, 250, 251)' // bg-gray-50
         });
+        // --- AKHIR PERBAIKAN ---
 
         // Event listener untuk tombol Hapus
         clearButton.addEventListener('click', (e) => {
@@ -223,4 +236,5 @@
     </script>
 </body>
 </html>
+
 
